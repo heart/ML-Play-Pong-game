@@ -75,7 +75,8 @@ def reset():
     """ ✅ รีเซ็ตเกมโดยสุ่มตำแหน่งลูกบอลใหม่ """
     global ballX, ballY, ballXSpeed, ballYSpeed, paddleX
     ballX, ballY, ballXSpeed, ballYSpeed = reset_ball()
-    paddleX = math.floor(sceneSize / 2)  # Paddle กลับมาตรงกลาง
+    paddleX = random.randint(0, sceneSize - paddleWidth)  # เริ่ม Paddle ที่ตำแหน่งสุ่ม
+
 
 def move_left():
     global paddleX
