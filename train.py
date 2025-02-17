@@ -177,7 +177,9 @@ def train_dqn(episodes=5000):
                     # ให้ reward ตามตำแหน่งของ paddle เทียบกับลูก
                     paddle_center = game.paddleX + (game.paddleWidth / 2)
                     ball_distance = abs(paddle_center - game.ballX)
-                    reward = 1 - (ball_distance / game.sceneSize)
+                    # reward = 1 - (ball_distance / game.sceneSize)
+                    reward += max(5 - (ball_distance / game.sceneSize) * 5, 0)  # ให้ reward มากขึ้นถ้า paddle อยู่ถูกตำแหน่ง
+
                 elif ballYSpeed < 0:  # ลูกกำลังขึ้นไปหากำแพง
                     reward = 3  # ให้รางวัลเพราะแสดงว่าเราตีลูกได้ดี
 
