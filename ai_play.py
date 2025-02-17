@@ -12,7 +12,7 @@ else:
     print("⚠️ ไม่พบ GPU, ใช้ CPU แทน")
 
 # โหลดโมเดลที่เทรนไว้
-model = tf.keras.models.load_model("ai_pong-v1.h5", custom_objects={"mse": tf.keras.losses.MeanSquaredError()})
+model = tf.keras.models.load_model("ai_pong_final.h5", custom_objects={"mse": tf.keras.losses.MeanSquaredError()})
 
 
 def play_ai():
