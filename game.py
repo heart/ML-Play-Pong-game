@@ -2,6 +2,8 @@ import os
 import time
 import random
 import math
+import sys
+
 class PongGame:
     def __init__(self, width=30, height=20, paddle_size=7):
         self.width = width
@@ -74,7 +76,10 @@ class PongGame:
         if self.ball_y >= self.height - 2:
             paddle_left = self.paddle_x - self.paddle_size // 2
             paddle_right = self.paddle_x + self.paddle_size // 2
-            if paddle_left <= self.ball_x <= paddle_right:
+
+            nextX = self.ball_x + self.ball_speed_x
+            nextY = self.ball_y + self.ball_speed_y
+            if nextX >= paddle_left and nextX <= paddle_right and nextY == self.paddle_y:
                 self.ball_speed_y *= -1
                 self.hits += 1
                 hit = True
@@ -85,9 +90,17 @@ class PongGame:
         return hit, done
 
     def render(self):
-        """Render game state to terminal"""
-        # Clear screen
-        os.system('cls' if os.name == 'nt' else 'clear')
+        """Render game state to terminal ด้วยการ concat string แล้ว print ครั้งเดียว"""
+        # ย้ายเคอร์เซอร์ไปที่ตำแหน่ง home และล้างหน้าจอทั้งหมด
+        sys.stdout.write("\033[H\033[J")
+        sys.stdout.flush()
+        
+        # สร้างรายการสำหรับเก็บแต่ละบรรทัด
+        lines = []
+        
+        # วาดขอบบนของเกม
+        border = '-' * (self.width + 2)
+        lines.append(border)
         
         # สร้าง board ว่าง
         board = [[' ' for _ in range(self.width)] for _ in range(self.height)]
@@ -102,50 +115,56 @@ class PongGame:
             if 0 <= x < self.width:
                 board[self.paddle_y][x] = '='
         
-        # วาดขอบและ board
-        print('-' * (self.width + 2))
+        # สร้างบรรทัดของ board
         for row in board:
-            print('|' + ''.join(row) + '|')
-        print('-' * (self.width + 2))
+            lines.append('|' + ''.join(row) + '|')
+        
+        # วาดขอบล่างของเกม
+        lines.append(border)
         
         # แสดงคะแนน
-        print(f'Hits: {self.hits}')
+        lines.append(f'Hits: {self.hits}')
+        
+        # รวมทุกบรรทัดเป็น string เดียวแล้ว print ครั้งเดียว
+        output = "\n".join(lines)
+        print(output)
 
-def play_manual():
-    """Function to play the game manually for testing"""
-    game = PongGame(30, 20, paddle_size=7)
-    done = False
+
+# def play_manual():
+#     """Function to play the game manually for testing"""
+#     game = PongGame(30, 20, paddle_size=7)
+#     done = False
     
-    while not done:
-        game.render()
+#     while not done:
+#         game.render()
         
-        # รับอินพุต (non-blocking)
-        import sys
-        import select
+#         # รับอินพุต (non-blocking)
+#         import sys
+#         import select
         
-        if sys.platform != 'win32':  # สำหรับ Unix-like systems
-            rlist, _, _ = select.select([sys.stdin], [], [], 0.1)
-            if rlist:
-                key = sys.stdin.read(1)
-                if key == 'a':
-                    game.moveLeft()
-                elif key == 'd':
-                    game.moveRight()
-        else:  # สำหรับ Windows
-            import msvcrt
-            if msvcrt.kbhit():
-                key = msvcrt.getch().decode('utf-8')
-                if key == 'a':
-                    game.moveLeft()
-                elif key == 'd':
-                    game.moveRight()
+#         if sys.platform != 'win32':  # สำหรับ Unix-like systems
+#             rlist, _, _ = select.select([sys.stdin], [], [], 0.1)
+#             if rlist:
+#                 key = sys.stdin.read(1)
+#                 if key == 'a':
+#                     game.moveLeft()
+#                 elif key == 'd':
+#                     game.moveRight()
+#         else:  # สำหรับ Windows
+#             import msvcrt
+#             if msvcrt.kbhit():
+#                 key = msvcrt.getch().decode('utf-8')
+#                 if key == 'a':
+#                     game.moveLeft()
+#                 elif key == 'd':
+#                     game.moveRight()
         
-        hit, done = game.tick()
-        time.sleep(0.1)  # ควบคุมความเร็วของเกม
+#         hit, done = game.tick()
+#         time.sleep(0.1)  # ควบคุมความเร็วของเกม
         
-    game.render()
-    print("Game Over!")
-    print(f"Final Score: {game.hits}")
+#     game.render()
+#     print("Game Over!")
+#     print(f"Final Score: {game.hits}")
 
-if __name__ == "__main__":
-    play_manual()
+# if __name__ == "__main__":
+#     play_manual()

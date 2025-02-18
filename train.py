@@ -104,17 +104,35 @@ def train_agent(game, episodes=1000):
     agent = PongDQNAgent()
     history_buffer = deque(maxlen=3)
 
+    #=== RESUME ======
     checkpoint_path = "latest_model.weights.h5"
+    counter_file = "episode_counter.txt"
+
+    # อ่านหมายเลข episode ล่าสุดจากไฟล์ (ถ้ามี)
+    start_episode = 0
+    if os.path.exists(counter_file):
+        try:
+            with open(counter_file, "r") as f:
+                start_episode = int(f.read().strip())
+        except:
+            start_episode = 0
+
+    # ถ้ามี checkpoint ให้โหลดน้ำหนักโมเดล
     if os.path.exists(checkpoint_path):
         agent.model.load_weights(checkpoint_path)
         agent.update_target_model()
         print("Resumed model from checkpoint:", checkpoint_path)
+        print("Starting from episode", start_episode)
+    else:
+        print("Starting training from scratch!")
+
+    #===== RESUME ======
     
     # เตรียม history buffer ด้วยค่าเริ่มต้น (3 frame ของศูนย์)
     for _ in range(3):
         history_buffer.append(np.zeros(5))
     
-    for episode in range(episodes):
+    for episode in range(start_episode, episodes):
         # รีเซ็ตเกมและ history buffer ในแต่ละ episode
         game.reset()
         history_buffer.clear()
@@ -165,18 +183,25 @@ def train_agent(game, episodes=1000):
             
         # อัปเดท target network ทุกครั้งที่จบ episode
         agent.update_target_model()
+
         # ลดค่า epsilon ทีละ episode
         if agent.epsilon > agent.epsilon_min:
             agent.epsilon *= agent.epsilon_decay
             agent.epsilon = max(agent.epsilon, agent.epsilon_min)
         print(f"Episode {episode + 1} finished with Total Reward: {total_reward:.2f}, Epsilon: {agent.epsilon:.3f}")
         
+        # บันทึก checkpoint ทุกๆ 100 episode พร้อมบันทึกหมายเลข episode
         if (episode + 1) % 100 == 0:
             agent.model.save_weights(checkpoint_path)
+            with open(counter_file, "w") as f:
+                f.write(str(episode + 1))
             print(f"Checkpoint saved at episode {episode + 1}")
+
 
     # บันทึกโมเดลขั้นสุดท้ายเป็น model_final.h5
     agent.model.save("model_final.h5")
+    with open(counter_file, "w") as f:
+        f.write(str(episodes))
 
     return agent
 
