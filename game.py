@@ -1,7 +1,7 @@
 import os
 import time
 import random
-
+import math
 class PongGame:
     def __init__(self, width=30, height=20, paddle_size=7):
         self.width = width
@@ -14,8 +14,9 @@ class PongGame:
     def reset(self):
         """Reset the game to initial state"""
         # Ball position and speed
-        self.ball_x = self.width // 2
-        self.ball_y = self.height // 2
+       
+        self.ball_x = random.randint(0, self.width-1)
+        self.ball_y = random.randint(0, math.floor(self.height/2)-1)
         self.ball_speed_x = random.choice([-1, 1])
         self.ball_speed_y = random.choice([-1, 1])
         

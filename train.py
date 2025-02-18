@@ -14,8 +14,7 @@ else:
     print("⚠️ ไม่พบ GPU, ใช้ CPU แทน")
 
 class PongDQNAgent:
-    def __init__(self, state_size=15, action_size=3, memory_size=2000):
-        # State size = 5 features * 3 frames
+    def __init__(self, state_size=15, action_size=3, memory_size=5000):
         self.state_size = state_size  
         self.action_size = action_size  # [moveLeft, stay, moveRight]
         
@@ -24,20 +23,20 @@ class PongDQNAgent:
         self.epsilon = 1.0  # exploration rate
         self.epsilon_min = 0.01
         self.epsilon_decay = 0.995
-        self.learning_rate = 0.001
+        self.learning_rate = 0.0005
         
-        # Memory for experience replay
+        # Memory สำหรับ experience replay
         self.memory = deque(maxlen=memory_size)
         
-        # Neural Network for Deep Q-learning
+        # Neural Network สำหรับ Deep Q-learning (เพิ่มความซับซ้อน)
         self.model = self._build_model()
         self.target_model = self._build_model()
         self.update_target_model()
 
     def _build_model(self):
         model = tf.keras.Sequential([
-            tf.keras.layers.Dense(64, input_dim=self.state_size, activation='relu'),
-            tf.keras.layers.Dense(64, activation='relu'),
+            tf.keras.layers.Dense(128, input_dim=self.state_size, activation='relu'),
+            tf.keras.layers.Dense(128, activation='relu'),
             tf.keras.layers.Dense(self.action_size, activation='linear')
         ])
         model.compile(loss='mse', optimizer=tf.keras.optimizers.Adam(learning_rate=self.learning_rate))
@@ -68,7 +67,7 @@ class PongDQNAgent:
             states[i] = state
             next_states[i] = next_state
 
-        # Predict Q-values for current states and next states
+        # คาดการณ์ Q-values สำหรับสถานะปัจจุบันและสถานะถัดไป
         target = self.model.predict(states, verbose=0)
         target_next = self.target_model.predict(next_states, verbose=0)
 
@@ -79,14 +78,12 @@ class PongDQNAgent:
                 target[i][action] = reward + self.gamma * np.amax(target_next[i])
 
         self.model.fit(states, target, epochs=1, verbose=0)
-        
-        if self.epsilon > self.epsilon_min:
-            self.epsilon *= self.epsilon_decay
+        # ลบการลด epsilon ออกจาก replay เพื่อให้ลดทีละ episode แทน
 
 def process_state(game_state, history_buffer):
     """
-    Process current game state and maintain history buffer
-    Returns flattened state vector combining current and historical states
+    Process สถานะเกมปัจจุบันและอัปเดต history buffer
+    คืนค่าเป็นเวกเตอร์ที่รวมข้อมูลของ frame ปัจจุบันและ frame ก่อนหน้า
     """
     current_state = np.array([
         game_state['ball_x'],
@@ -97,16 +94,15 @@ def process_state(game_state, history_buffer):
     ])
     
     history_buffer.append(current_state)
-    if len(history_buffer) > 3:  # Keep last 3 frames
+    if len(history_buffer) > 3:  # เก็บเฉพาะ 3 frame ล่าสุด
         history_buffer.popleft()
         
-    # Flatten the history buffer into a single vector
+    # Flatten history buffer เป็นเวกเตอร์เดียว
     return np.concatenate(list(history_buffer))
 
 def train_agent(game, episodes=1000):
     agent = PongDQNAgent()
     history_buffer = deque(maxlen=3)
-
 
     checkpoint_path = "latest_model.weights.h5"
     if os.path.exists(checkpoint_path):
@@ -114,13 +110,12 @@ def train_agent(game, episodes=1000):
         agent.update_target_model()
         print("Resumed model from checkpoint:", checkpoint_path)
     
-    # Initialize history buffer with initial state
-    initial_state = process_state(game.get_state(), history_buffer)
-    for _ in range(3):  # Fill buffer with initial state
+    # เตรียม history buffer ด้วยค่าเริ่มต้น (3 frame ของศูนย์)
+    for _ in range(3):
         history_buffer.append(np.zeros(5))
     
     for episode in range(episodes):
-        # Reset game and history buffer
+        # รีเซ็ตเกมและ history buffer ในแต่ละ episode
         game.reset()
         history_buffer.clear()
         for _ in range(3):
@@ -128,77 +123,67 @@ def train_agent(game, episodes=1000):
         
         total_reward = 0
         done = False
+        step = 0
         
         while not done:
-            # Get current state
+            # รับสถานะปัจจุบัน
             current_state = process_state(game.get_state(), history_buffer)
             
-            # Choose action
+            # เลือก action โดยใช้ epsilon-greedy
             action = agent.act(current_state)
             
-            # Execute action
+            # ดำเนินการ action ที่เลือก
             if action == 0:
                 game.moveLeft()
             elif action == 2:
                 game.moveRight()
-            # action 1 is "stay" - do nothing
+            # action 1 คือ "stay" - ไม่ทำอะไร
             
-            # Progress game and get reward
+            # ทำให้เกมก้าวไปข้างหน้าและรับผลลัพธ์
             hit, done = game.tick()
             game.render()
-            print(f"Episode: {episode + 1}, Score: {total_reward}, Epsilon: {agent.epsilon:.2f}")
+            step += 1
+            print(f"Episode: {episode + 1}, Step: {step}, Total Reward: {total_reward:.2f}, Epsilon: {agent.epsilon:.3f}")
 
-            reward = 1 if hit else (-10 if done else 0)
+            # Reward shaping: ให้รางวัลตามผลลัพธ์ของ action
+            if done:
+                reward = -10
+            elif hit:
+                reward = 1
+            else:
+                reward = -0.01  # ให้รางวัลติดลบเล็กน้อยเพื่อผลักดันให้ agent พยายามอยู่ในเกม
             total_reward += reward
             
-            # Get new state
+            # รับสถานะถัดไป
             next_state = process_state(game.get_state(), history_buffer)
             
-            # Store experience
+            # เก็บประสบการณ์
             agent.remember(current_state, action, reward, next_state, done)
             
-            # Train agent
+            # ฝึก agent โดยใช้ experience replay
             agent.replay(32)
             
-            if done:
-                # Update target network every episode
-                agent.update_target_model()
-                print(f"Episode: {episode + 1}, Score: {total_reward}, Epsilon: {agent.epsilon:.2f}")
-                break
-
+        # อัปเดท target network ทุกครั้งที่จบ episode
+        agent.update_target_model()
+        # ลดค่า epsilon ทีละ episode
+        if agent.epsilon > agent.epsilon_min:
+            agent.epsilon *= agent.epsilon_decay
+            agent.epsilon = max(agent.epsilon, agent.epsilon_min)
+        print(f"Episode {episode + 1} finished with Total Reward: {total_reward:.2f}, Epsilon: {agent.epsilon:.3f}")
+        
         if (episode + 1) % 100 == 0:
             agent.model.save_weights(checkpoint_path)
             print(f"Checkpoint saved at episode {episode + 1}")
 
-    #Final model saved as model_final.h5
+    # บันทึกโมเดลขั้นสุดท้ายเป็น model_final.h5
     agent.model.save("model_final.h5")
 
     return agent
 
-# Example usage:
-"""
-# Assuming we have a game class that implements the required interface:
-game = PongGame()  # Your game implementation
-agent = train_agent(game)
+# ตัวอย่างการใช้งาน:
+# สมมุติว่าคุณมีคลาสเกม Pong ที่ implement อินเตอร์เฟสที่กำหนดไว้:
+# game = PongGame()  # การ implement เกมของคุณ
+# agent = train_agent(game)
 
-# To use the trained agent:
-def play_game(agent, game):
-    done = False
-    history_buffer = deque(maxlen=3)
-    for _ in range(3):
-        history_buffer.append(np.zeros(5))
-    
-    while not done:
-        state = process_state(game.get_state(), history_buffer)
-        action = agent.act(state)
-        
-        if action == 0:
-            game.moveLeft()
-        elif action == 2:
-            game.moveRight()
-            
-        hit, done = game.tick()
-"""
-
-game = PongGame(24,24,4)  
-agent = train_agent(game)
+game = PongGame(24, 24, 4)  
+agent = train_agent(game, episodes=5000)
