@@ -1,98 +1,150 @@
 import os
 import time
-import math
 import random
 
-sceneSize = 24
+class PongGame:
+    def __init__(self, width=30, height=20, paddle_size=7):
+        self.width = width
+        self.height = height
+        self.paddle_size = paddle_size
+        
+        # Initialize game state
+        self.reset()
 
-# ✅ Random Ball Position & Speed
-def reset_ball():
-    ballX = random.randint(2, sceneSize - 3)  # เลี่ยงขอบ
-    ballY = random.randint(2, sceneSize // 2)  # ไม่เริ่มใกล้ Paddle เกินไป
-    ballXSpeed = random.choice([-1, 1])  # สุ่มทิศทางซ้าย/ขวา
-    ballYSpeed = random.choice([-1, 1])  # สุ่มทิศทางขึ้น/ลง
-    return ballX, ballY, ballXSpeed, ballYSpeed
+    def reset(self):
+        """Reset the game to initial state"""
+        # Ball position and speed
+        self.ball_x = self.width // 2
+        self.ball_y = self.height // 2
+        self.ball_speed_x = random.choice([-1, 1])
+        self.ball_speed_y = random.choice([-1, 1])
+        
+        # Paddle position (paddle จะอยู่ด้านล่าง แนวนอน)
+        self.paddle_x = self.width // 2
+        self.paddle_y = self.height - 1
+        
+        # Score
+        self.hits = 0
+        return self.get_state()
 
-# ✅ กำหนดค่าเริ่มต้นของเกมแบบสุ่ม
-ballX, ballY, ballXSpeed, ballYSpeed = reset_ball()
+    def get_state(self):
+        """Return current game state"""
+        return {
+            'ball_x': self.ball_x,
+            'ball_y': self.ball_y,
+            'ball_speed_x': self.ball_speed_x,
+            'ball_speed_y': self.ball_speed_y,
+            'paddle_x': self.paddle_x,
+            'paddle_y': self.paddle_y
+        }
 
-paddleWidth = 3
-paddleX = math.floor(sceneSize / 2)
-paddleY = sceneSize - 1 
+    def moveLeft(self):
+        """Move paddle left (ลดค่า x)"""
+        if self.paddle_x > self.paddle_size // 2:
+            self.paddle_x -= 1
 
-def clear_screen():
-    if os.name == 'nt':
-        _ = os.system('cls')
-    else:
-        _ = os.system('clear')
+    def moveRight(self):
+        """Move paddle right (เพิ่มค่า x)"""
+        if self.paddle_x < self.width - (self.paddle_size // 2) - 1:
+            self.paddle_x += 1
 
-def tick():
-    global ballX, ballY, ballXSpeed, ballYSpeed, paddleX, paddleY
+    def tick(self):
+        """Progress game by one frame"""
+        # Update ball position
+        self.ball_x += self.ball_speed_x
+        self.ball_y += self.ball_speed_y
+
+        # ตรวจสอบขอบในแนวแกน x
+        if self.ball_x < 0:
+            self.ball_x = 0
+            self.ball_speed_x *= -1
+        elif self.ball_x >= self.width:
+            self.ball_x = self.width - 1
+            self.ball_speed_x *= -1
+
+        # ตรวจสอบขอบบนในแนวแกน y
+        if self.ball_y < 0:
+            self.ball_y = 0
+            self.ball_speed_y *= -1
+        # ไม่ต้องตีกลับด้านล่างเพราะ paddle อยู่ด้านล่าง
+
+        # ตรวจสอบการชนกับ paddle (ที่ด้านล่าง)
+        hit = False
+        if self.ball_y >= self.height - 2:
+            paddle_left = self.paddle_x - self.paddle_size // 2
+            paddle_right = self.paddle_x + self.paddle_size // 2
+            if paddle_left <= self.ball_x <= paddle_right:
+                self.ball_speed_y *= -1
+                self.hits += 1
+                hit = True
+
+        # ตรวจสอบว่าลูกบอลหลุดออกจาก paddle แล้วหรือยัง
+        done = self.ball_y >= self.height - 1
+
+        return hit, done
+
+    def render(self):
+        """Render game state to terminal"""
+        # Clear screen
+        os.system('cls' if os.name == 'nt' else 'clear')
+        
+        # สร้าง board ว่าง
+        board = [[' ' for _ in range(self.width)] for _ in range(self.height)]
+        
+        # วาดลูกบอล
+        if 0 <= self.ball_y < self.height and 0 <= self.ball_x < self.width:
+            board[self.ball_y][self.ball_x] = 'O'
+        
+        # วาด paddle แนวนอนที่ด้านล่าง
+        for i in range(self.paddle_size):
+            x = self.paddle_x - (self.paddle_size // 2) + i
+            if 0 <= x < self.width:
+                board[self.paddle_y][x] = '='
+        
+        # วาดขอบและ board
+        print('-' * (self.width + 2))
+        for row in board:
+            print('|' + ''.join(row) + '|')
+        print('-' * (self.width + 2))
+        
+        # แสดงคะแนน
+        print(f'Hits: {self.hits}')
+
+def play_manual():
+    """Function to play the game manually for testing"""
+    game = PongGame(30, 20, paddle_size=7)
+    done = False
     
-    gameUpdate()
+    while not done:
+        game.render()
+        
+        # รับอินพุต (non-blocking)
+        import sys
+        import select
+        
+        if sys.platform != 'win32':  # สำหรับ Unix-like systems
+            rlist, _, _ = select.select([sys.stdin], [], [], 0.1)
+            if rlist:
+                key = sys.stdin.read(1)
+                if key == 'a':
+                    game.moveLeft()
+                elif key == 'd':
+                    game.moveRight()
+        else:  # สำหรับ Windows
+            import msvcrt
+            if msvcrt.kbhit():
+                key = msvcrt.getch().decode('utf-8')
+                if key == 'a':
+                    game.moveLeft()
+                elif key == 'd':
+                    game.moveRight()
+        
+        hit, done = game.tick()
+        time.sleep(0.1)  # ควบคุมความเร็วของเกม
+        
+    game.render()
+    print("Game Over!")
+    print(f"Final Score: {game.hits}")
 
-    # ✅ เช็คว่าบอลโดน Paddle หรือเปล่า
-    hit = False
-    game_over = False
-
-    if ballY == paddleY - 1 and paddleX <= ballX < paddleX + paddleWidth:
-        ballYSpeed *= -1  # เด้งกลับ
-        hit = True  # ✅ AI ควรได้รับ Reward
-
-    # ✅ เช็คว่าบอลตกขอบล่าง (Game Over)
-    if ballY >= sceneSize - 1:
-        game_over = True
-
-    return hit, game_over
-
-
-def gameUpdate():
-    global ballX, ballY, ballXSpeed, ballYSpeed
-    ballX += ballXSpeed
-    ballY += ballYSpeed
-
-    # ✅ ถ้าบอลชนขอบซ้ายหรือขวา → เด้งกลับ
-    if ballX == 0 or ballX == sceneSize - 1:
-        ballXSpeed *= -1
-
-    # ✅ ถ้าบอลชนขอบบน → เด้งกลับ
-    if ballY == 0:
-        ballYSpeed *= -1
-
-def render():
-    clear_screen()
-    for i in range(sceneSize):
-        for j in range(sceneSize):
-            if i == ballY and j == ballX:
-                print("O", end="")
-            elif i == paddleY and paddleX <= j < paddleX + paddleWidth:
-                print("=", end="")
-            else:
-                print(" ", end="")
-        print("")
-
-def reset():
-    """ ✅ รีเซ็ตเกมโดยสุ่มตำแหน่งลูกบอลใหม่ """
-    global ballX, ballY, ballXSpeed, ballYSpeed, paddleX
-    ballX, ballY, ballXSpeed, ballYSpeed = reset_ball()
-    paddleX = random.randint(0, sceneSize - paddleWidth)  # เริ่ม Paddle ที่ตำแหน่งสุ่ม
-
-
-def move_left():
-    global paddleX
-    if paddleX > 0:
-        paddleX -= 1
-
-def move_right():
-    global paddleX
-    if paddleX + paddleWidth < sceneSize:
-        paddleX += 1
-
-def get_state():
-    """ ✅ ส่งสถานะของเกม """
-    state = [[0] * sceneSize for _ in range(sceneSize)]
-    state[ballY][ballX] = 1  # Mark Ball
-    for j in range(paddleX, paddleX + paddleWidth):
-        state[paddleY][j] = 2  # Mark Paddle
-
-    return state, ballXSpeed, ballYSpeed
+if __name__ == "__main__":
+    play_manual()
