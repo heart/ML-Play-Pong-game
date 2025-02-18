@@ -108,7 +108,7 @@ def train_agent(game, episodes=1000):
     history_buffer = deque(maxlen=3)
 
 
-    checkpoint_path = "latest_model.h5"
+    checkpoint_path = "latest_model.weights.h5"
     if os.path.exists(checkpoint_path):
         agent.model.load_weights(checkpoint_path)
         agent.update_target_model()
@@ -148,7 +148,7 @@ def train_agent(game, episodes=1000):
             game.render()
             print(f"Episode: {episode + 1}, Score: {total_reward}, Epsilon: {agent.epsilon:.2f}")
 
-            reward = 1 if hit else (-1 if done else 0)
+            reward = 1 if hit else (-10 if done else 0)
             total_reward += reward
             
             # Get new state
